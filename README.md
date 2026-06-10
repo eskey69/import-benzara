@@ -33,3 +33,39 @@ Drugi etap projektu:
 - [Plan działania](./docs/PLAN.md)
 - [Analiza wejścia i ryzyk](./docs/ANALYSIS.md)
 - [Notatki o pluginie](./docs/PLUGIN-NOTES.md)
+
+## Pierwsza wersja CLI
+
+Aktualna wersja projektu zawiera pierwszy generator pliku wsadowego:
+
+Najpierw uruchom z katalogu projektu:
+
+```bash
+python -m pip install -e .
+```
+
+albo ustaw tymczasowo `PYTHONPATH=src`.
+
+Przykład:
+
+```bash
+python -m import_benzara generate ^
+  --inventory "C:\Users\skrupa\Documents\!_benzara\produkty\Benzara Inventory_19_05_2023.csv" ^
+  --catalog "C:\Users\skrupa\Documents\!_benzara\produkty\FTP Benzara MAY (15-05-2026).xlsx" ^
+  --output "C:\Users\skrupa\Documents\import-benzara\data\output\benzara-update.csv"
+```
+
+Generator:
+
+- łączy dane po `SKU`,
+- zachowuje kolejność i strukturę kolumn z pliku katalogowego,
+- aktualizuje kolumnę `Inventory Qty`, jeśli istnieje,
+- zawsze dopisuje kolumnę `Qty`,
+- generuje dodatkowe raporty `inventory-only`, `catalog-only` i `summary.json`.
+
+## Założenia wersji v1
+
+- eksportowane są tylko SKU obecne w obu plikach,
+- nie tworzymy nowych produktów,
+- nie modyfikujemy jeszcze URL-i zdjęć,
+- raportujemy rozjazdy między źródłami zamiast ukrywać je w tle.
