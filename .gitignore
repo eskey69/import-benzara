@@ -1,7 +1,10 @@
 _analysis/
-data/input/
-data/output/
-tmp/
+data/input/*
+!data/input/.gitkeep
+data/output/*
+!data/output/.gitkeep
+tmp/*
+!tmp/.gitkeep
 __pycache__/
 *.pyc
 *.pyo
