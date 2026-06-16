@@ -31,6 +31,7 @@ Zbudowac aplikacje, ktora:
 - [07-plan-realizacji.md](C:/Users/skrupa/Documents/Benzara%20project/projekt-importu-benzara/07-plan-realizacji.md)
 - [08-otwarte-pytania.md](C:/Users/skrupa/Documents/Benzara%20project/projekt-importu-benzara/08-otwarte-pytania.md)
 - [09-specyfikacja-zrodel-benzara.md](C:/Users/skrupa/Documents/Benzara%20project/projekt-importu-benzara/09-specyfikacja-zrodel-benzara.md)
+- [10-specyfikacja-importu-stock-benzara.md](C:/Users/skrupa/Documents/Benzara%20project/projekt-importu-benzara/10-specyfikacja-importu-stock-benzara.md)
 
 ## Materialy referencyjne
 
