@@ -6,10 +6,20 @@ import tempfile
 import unittest
 from pathlib import Path
 
-import pandas as pd
+from openpyxl import Workbook
 
 from import_benzara.config import AppConfig
 from import_benzara.pipeline import generate_feed
+
+
+def write_catalog_xlsx(path: Path, rows: list[dict[str, str]]) -> None:
+    workbook = Workbook()
+    sheet = workbook.active
+    headers = list(rows[0].keys())
+    sheet.append(headers)
+    for row in rows:
+        sheet.append([row.get(header, "") for header in headers])
+    workbook.save(path)
 
 
 class PipelineTest(unittest.TestCase):
@@ -24,14 +34,13 @@ class PipelineTest(unittest.TestCase):
             catalog_only_path = base / "catalog-only.csv"
 
             inventory_path.write_text("SKU,Qty\nSKU-1,4\nSKU-3,9\n", encoding="utf-8-sig")
-
-            dataframe = pd.DataFrame(
+            write_catalog_xlsx(
+                catalog_path,
                 [
                     {"SKU": "SKU-1", "Inventory Qty": "10", "Title": "Chair", "Wholesale Price": "100.00"},
                     {"SKU": "SKU-2", "Inventory Qty": "8", "Title": "Table", "Wholesale Price": "250.00"},
-                ]
+                ],
             )
-            dataframe.to_excel(catalog_path, index=False)
 
             config = AppConfig(
                 inventory_csv=inventory_path,
@@ -78,7 +87,7 @@ class PipelineTest(unittest.TestCase):
             catalog_only_path = base / "catalog-only.csv"
 
             inventory_path.write_text("SKU,Qty\nSKU-1,2\n", encoding="utf-8-sig")
-            pd.DataFrame([{"SKU": "SKU-1", "Inventory Qty": "9", "Title": "Lamp"}]).to_excel(catalog_path, index=False)
+            write_catalog_xlsx(catalog_path, [{"SKU": "SKU-1", "Inventory Qty": "9", "Title": "Lamp"}])
 
             config = AppConfig(
                 inventory_csv=inventory_path,

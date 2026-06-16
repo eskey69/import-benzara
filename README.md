@@ -1,71 +1,141 @@
 # import-benzara
 
-Lokalna aplikacja do przygotowania pliku wsadowego dla pluginu `Dropshipping Import Products for WooCommerce` na podstawie danych Benzara.
+Serwerowa aplikacja do generowania publicznego feedu `XML` dla pluginu `Dropshipping XML WooCommerce PRO` na podstawie danych Benzara.
 
-## Cel
+## Co robi aplikacja
 
-Pierwszy etap projektu:
+Aplikacja:
 
-- pobrać katalog referencyjny Benzara z pliku `FTP Benzara MAY (15-05-2026).xlsx`,
-- podmienić lub uzupełnić w nim stany magazynowe z pliku `Benzara Inventory_19_05_2023.csv`,
-- wygenerować plik CSV gotowy do aktualizacji istniejących produktów w WooCommerce przez plugin WP Desk.
+- przyjmuje plik bazowy `XLSX` z pelnym katalogiem Benzara,
+- przyjmuje plik `Inventory CSV` ze stanami magazynowymi,
+- laczy dane po `SKU`,
+- stosuje prog stocku `10` sztuk,
+- wszystko ponizej progu eksportuje jako `stock_qty = 0`,
+- ustawia `stock_status` na `instock` albo `outofstock`,
+- publikuje publiczny `feed.xml` gotowy do podpiecia w WooCommerce.
 
-Drugi etap projektu:
+## Logika biznesowa
 
-- przygotować moduł do wykrywania i uzupełniania brakujących lub błędnych URL-i zdjęć.
+Docelowa regula:
 
-## Status startowy
+- `Qty >= 10` -> eksportuj realny stock
+- `Qty < 10` -> eksportuj `0`
+- brak SKU w inventory -> eksportuj `0`
 
-- katalog roboczy i lokalne repo Git zostały utworzone,
-- archiwa referencyjne zostały rozpakowane do `_analysis/`,
-- dokumentacja robocza znajduje się w katalogu `docs/`.
+Produkty ze stanem `0` nie powinny byc pomijane w feedzie. Powinny byc eksportowane jako `outofstock`, a ich ukrywanie ma byc realizowane przez ustawienia WooCommerce.
 
-## Najważniejsze ustalenia
+## Dlaczego ta wersja nadaje sie na Namecheap
 
-- stara aplikacja `import-app` generowała wynik na bazie pełnego katalogu Benzara i doklejała kolumnę `Qty`,
-- stary przepływ dodatkowo normalizował cenę i podmieniał prefiks URL zdjęć,
-- plugin WP Desk obsługuje import i aktualizację produktów z CSV/XML, mapowanie po SKU oraz tryb `update existing products only`,
-- pliki wejściowe mają rozbieżne daty w nazwach: `19-05-2023` i `15-05-2026`,
-- pokrycie SKU między aktualnym plikiem stanów i katalogiem referencyjnym jest obecnie niskie i wymaga weryfikacji biznesowej.
+Projekt zostal przygotowany pod model:
 
-## Dokumentacja projektu
+- aplikacja Python uruchomiona jako `WSGI app`,
+- panel WWW do uploadu plikow i generowania feedu,
+- publiczny endpoint `feed.xml`,
+- opcjonalny cron do odswiezania feedu z najnowszych uploadow.
 
-- [Plan działania](./docs/PLAN.md)
-- [Analiza wejścia i ryzyk](./docs/ANALYSIS.md)
-- [Notatki o pluginie](./docs/PLUGIN-NOTES.md)
+Repo zawiera:
 
-## Pierwsza wersja CLI
+- `passenger_wsgi.py`
+- `wsgi.py`
+- `generate_latest_stock_feed.py`
+- `requirements.txt`
+- panel Flask
+- CLI do generowania feedu
+- dokumentacje wdrozenia
 
-Aktualna wersja projektu zawiera pierwszy generator pliku wsadowego:
+## Struktura projektu
 
-Najpierw uruchom z katalogu projektu:
+- `src/import_benzara/` - kod aplikacji
+- `src/import_benzara/webapp.py` - panel WWW
+- `src/import_benzara/stock_pipeline.py` - generator XML stock feedu
+- `data/uploads/` - wgrane pliki zrodlowe
+- `data/generated/latest/` - aktualny feed i raporty
+- `data/generated/runs/` - historia przebiegow
+- `docs/NAMECHEAP-DEPLOYMENT.md` - instrukcja wdrozenia
+
+## Instalacja zaleznosci
+
+Lokalnie:
 
 ```bash
-python -m pip install -e .
+pip install -e .
 ```
 
-albo ustaw tymczasowo `PYTHONPATH=src`.
+Na Namecheap mozna tez uzyc pliku `requirements.txt` w `cPanel -> Setup Python App -> Configuration files -> Run Pip Install`.
 
-Przykład:
+## Najwazniejsze komendy
+
+### 1. Legacy CSV generator
+
+Historyczny tryb CSV nadal jest dostepny:
 
 ```bash
-python -m import_benzara generate ^
-  --inventory "C:\Users\skrupa\Documents\!_benzara\produkty\Benzara Inventory_19_05_2023.csv" ^
-  --catalog "C:\Users\skrupa\Documents\!_benzara\produkty\FTP Benzara MAY (15-05-2026).xlsx" ^
-  --output "C:\Users\skrupa\Documents\import-benzara\data\output\benzara-update.csv"
+python -m import_benzara generate --inventory path/to/inventory.csv --catalog path/to/catalog.xlsx --output path/to/output.csv
 ```
 
-Generator:
+### 2. Stock feed XML
 
-- łączy dane po `SKU`,
-- zachowuje kolejność i strukturę kolumn z pliku katalogowego,
-- aktualizuje kolumnę `Inventory Qty`, jeśli istnieje,
-- zawsze dopisuje kolumnę `Qty`,
-- generuje dodatkowe raporty `inventory-only`, `catalog-only` i `summary.json`.
+```bash
+python -m import_benzara generate-stock-feed ^
+  --inventory "C:\path\to\inventory.csv" ^
+  --catalog "C:\path\to\catalog.xlsx" ^
+  --output-xml "C:\path\to\feed.xml" ^
+  --minimum-stock-threshold 10
+```
 
-## Założenia wersji v1
+### 3. Stock feed z najnowszych uploadow
 
-- eksportowane są tylko SKU obecne w obu plikach,
-- nie tworzymy nowych produktów,
-- nie modyfikujemy jeszcze URL-i zdjęć,
-- raportujemy rozjazdy między źródłami zamiast ukrywać je w tle.
+```bash
+python -m import_benzara generate-latest-stock-feed --data-root "C:\path\to\data" --minimum-stock-threshold 10
+```
+
+Na Namecheap bez `pip install -e .` bezpieczniejszy jest wrapper:
+
+```bash
+python generate_latest_stock_feed.py --data-root "C:\path\to\data" --minimum-stock-threshold 10
+```
+
+### 4. Lokalny panel WWW
+
+```bash
+python -m import_benzara serve --data-root "C:\path\to\data" --host 127.0.0.1 --port 8000
+```
+
+Po uruchomieniu:
+
+- panel admin: `http://127.0.0.1:8000/`
+- publiczny feed: `http://127.0.0.1:8000/feed.xml`
+
+## Zmienne srodowiskowe
+
+- `IMPORT_BENZARA_DATA_DIR` - katalog danych aplikacji
+- `IMPORT_BENZARA_MIN_STOCK_THRESHOLD` - domyslny prog stocku
+- `IMPORT_BENZARA_SECRET_KEY` - sekret Flask
+- `IMPORT_BENZARA_ADMIN_USER` - opcjonalny login Basic Auth
+- `IMPORT_BENZARA_ADMIN_PASSWORD` - opcjonalne haslo Basic Auth
+
+## Co publikuje aplikacja
+
+Po kazdym poprawnym przebiegu:
+
+- `data/generated/latest/feed.xml`
+- `data/generated/latest/feed.summary.json`
+- `data/generated/latest/feed.inventory-only.csv`
+- `data/generated/latest/feed.catalog-only.csv`
+
+## Konfiguracja WooCommerce
+
+W pluginie `Dropshipping XML WooCommerce PRO` ustaw:
+
+- URL pliku: publiczny `feed.xml`
+- identyfikacja produktu: `SKU`
+- wezel produktu: `catalog/products/product`
+- mapowanie pol: `sku`, `stock/qty`, `stock/status`, `stock/manage`
+
+Synchronizuj tylko pola magazynowe.
+
+## Wdrozenie
+
+Instrukcja wdrozenia znajduje sie tutaj:
+
+- [docs/NAMECHEAP-DEPLOYMENT.md](./docs/NAMECHEAP-DEPLOYMENT.md)

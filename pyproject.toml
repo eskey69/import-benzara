@@ -4,17 +4,23 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "import-benzara"
-version = "0.1.0"
-description = "Generator pliku wsadowego Benzara dla WP Desk Dropshipping XML WooCommerce."
+version = "0.2.0"
+description = "Aplikacja Benzara do generowania feedu stockowego dla WP Desk Dropshipping XML WooCommerce."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+  "Flask>=3.0,<4.0",
   "openpyxl>=3.1",
-  "pandas>=2.0",
 ]
+
+[project.scripts]
+import-benzara = "import_benzara.cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
+
+[tool.setuptools.package-data]
+import_benzara = ["templates/*.html", "static/*.css"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
