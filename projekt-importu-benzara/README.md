@@ -30,6 +30,7 @@ Zbudowac aplikacje, ktora:
 - [06-ryzyka-i-zalozenia.md](C:/Users/skrupa/Documents/Benzara%20project/projekt-importu-benzara/06-ryzyka-i-zalozenia.md)
 - [07-plan-realizacji.md](C:/Users/skrupa/Documents/Benzara%20project/projekt-importu-benzara/07-plan-realizacji.md)
 - [08-otwarte-pytania.md](C:/Users/skrupa/Documents/Benzara%20project/projekt-importu-benzara/08-otwarte-pytania.md)
+- [09-specyfikacja-zrodel-benzara.md](C:/Users/skrupa/Documents/Benzara%20project/projekt-importu-benzara/09-specyfikacja-zrodel-benzara.md)
 
 ## Materialy referencyjne
 
