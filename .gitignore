@@ -1,4 +1,4 @@
-_analysis/
+﻿_analysis/
 data/input/*
 !data/input/.gitkeep
 data/output/*
@@ -27,3 +27,4 @@ __pycache__/
 .ruff_cache/
 .venv/
 .env
+/import-benzara_openai.env
