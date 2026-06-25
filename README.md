@@ -1,141 +1,173 @@
-# import-benzara
+# horpach-benzara
 
-Serwerowa aplikacja do generowania publicznego feedu `XML` dla pluginu `Dropshipping XML WooCommerce PRO` na podstawie danych Benzara.
+Aplikacja do przetwarzania danych produktowych z trzech plikow zrodlowych:
 
-## Co robi aplikacja
+- `horpachcom.WordPress.2026-06-24.xml` - eksport WooCommerce jako plik bazowy
+- `FTP Benzara JUNE (15-06-2026).xlsx` - pelna oferta Benzara
+- `latest.xml` - aktualne stany magazynowe
 
-Aplikacja:
+## Cel projektu
 
-- przyjmuje plik bazowy `XLSX` z pelnym katalogiem Benzara,
-- przyjmuje plik `Inventory CSV` ze stanami magazynowymi,
-- laczy dane po `SKU`,
-- stosuje prog stocku `10` sztuk,
-- wszystko ponizej progu eksportuje jako `stock_qty = 0`,
-- ustawia `stock_status` na `instock` albo `outofstock`,
-- publikuje publiczny `feed.xml` gotowy do podpiecia w WooCommerce.
+Program ma przygotowac plik wynikowy `d`, ktory pozwoli:
 
-## Logika biznesowa
+- zaktualizowac stany magazynowe
+- zaktualizowac ceny
+- dodac nowe produkty
+- pominac produkty nieoplacalne do wysylki na podstawie wagi i wymiarow
 
-Docelowa regula:
+## Glowna zasada laczenia danych
 
-- `Qty >= 10` -> eksportuj realny stock
-- `Qty < 10` -> eksportuj `0`
-- brak SKU w inventory -> eksportuj `0`
+Produkty sa laczone po SKU, ale program najpierw wykrywa, czy pole z identyfikatorem wystepuje jako:
 
-Produkty ze stanem `0` nie powinny byc pomijane w feedzie. Powinny byc eksportowane jako `outofstock`, a ich ukrywanie ma byc realizowane przez ustawienia WooCommerce.
+- `sku`
+- `_sku`
 
-## Dlaczego ta wersja nadaje sie na Namecheap
+Po wykryciu dane sa normalizowane do jednego pola wewnetrznego: `normalized_sku`.
 
-Projekt zostal przygotowany pod model:
+## Plan przetwarzania
 
-- aplikacja Python uruchomiona jako `WSGI app`,
-- panel WWW do uploadu plikow i generowania feedu,
-- publiczny endpoint `feed.xml`,
-- opcjonalny cron do odswiezania feedu z najnowszych uploadow.
-
-Repo zawiera:
-
-- `passenger_wsgi.py`
-- `wsgi.py`
-- `generate_latest_stock_feed.py`
-- `requirements.txt`
-- panel Flask
-- CLI do generowania feedu
-- dokumentacje wdrozenia
+1. Wczytanie pliku WooCommerce XML jako bazy istniejacych produktow.
+2. Wczytanie pliku XLSX Benzara z pelna oferta.
+3. Wczytanie pliku XML ze stanami magazynowymi.
+4. Wykrycie pola SKU w kazdym z plikow.
+5. Ujednolicenie danych do wspolnego modelu.
+6. Polaczenie rekordow po `normalized_sku`.
+7. Zastosowanie regul cen, stanow i kwalifikacji wysylkowej.
+8. Wygenerowanie pliku wynikowego do importu oraz raportu pomocniczego.
 
 ## Struktura projektu
 
-- `src/import_benzara/` - kod aplikacji
-- `src/import_benzara/webapp.py` - panel WWW
-- `src/import_benzara/stock_pipeline.py` - generator XML stock feedu
-- `data/uploads/` - wgrane pliki zrodlowe
-- `data/generated/latest/` - aktualny feed i raporty
-- `data/generated/runs/` - historia przebiegow
-- `docs/NAMECHEAP-DEPLOYMENT.md` - instrukcja wdrozenia
-
-## Instalacja zaleznosci
-
-Lokalnie:
-
-```bash
-pip install -e .
+```text
+horpach-benzara/
+  config/
+  data/
+    inbox/
+    working/
+    output/
+  docs/
+  src/
+    horpach_benzara/
+      loaders/
+      normalizers/
+      matchers/
+      rules/
+      exporters/
+  tests/
 ```
 
-Na Namecheap mozna tez uzyc pliku `requirements.txt` w `cPanel -> Setup Python App -> Configuration files -> Run Pip Install`.
+## Najwazniejsze decyzje do doprecyzowania
 
-## Najwazniejsze komendy
+- finalny format pliku `d` - CSV czy XML
+- wzor liczenia ceny sprzedazy
+- progi kwalifikacji wysylki
+- zasady publikacji nowych produktow
 
-### 1. Legacy CSV generator
+## Status
 
-Historyczny tryb CSV nadal jest dostepny:
+Aktualnie przygotowany jest szkielet projektu i dokumentacja startowa.
 
-```bash
-python -m import_benzara generate --inventory path/to/inventory.csv --catalog path/to/catalog.xlsx --output path/to/output.csv
-```
+## MVP CLI
 
-### 2. Stock feed XML
+Program posiada pierwsza wersje CLI, ktora:
 
-```bash
-python -m import_benzara generate-stock-feed ^
-  --inventory "C:\path\to\inventory.csv" ^
-  --catalog "C:\path\to\catalog.xlsx" ^
-  --output-xml "C:\path\to\feed.xml" ^
-  --minimum-stock-threshold 10
-```
+- wczytuje WooCommerce XML
+- wczytuje katalog Benzara z XLSX
+- wczytuje inventory XML
+- laczy rekordy po SKU
+- wykrywa WooCommerce SKU z pola `_sku`
+- stosuje podstawowe filtry wysylkowe
+- generuje wynikowy CSV z decyzjami `create`, `update`, `skip`
 
-### 3. Stock feed z najnowszych uploadow
-
-```bash
-python -m import_benzara generate-latest-stock-feed --data-root "C:\path\to\data" --minimum-stock-threshold 10
-```
-
-Na Namecheap bez `pip install -e .` bezpieczniejszy jest wrapper:
+Uruchomienie:
 
 ```bash
-python generate_latest_stock_feed.py --data-root "C:\path\to\data" --minimum-stock-threshold 10
+python -m horpach_benzara.main ^
+  --woo-xml data/inbox/horpachcom.WordPress.2026-06-24.xml ^
+  --supplier-xlsx "data/inbox/FTP Benzara JUNE (15-06-2026).xlsx" ^
+  --inventory-xml data/inbox/latest.xml ^
+  --config config/config.example.json ^
+  --output data/output/decisions.csv
 ```
 
-### 4. Lokalny panel WWW
+Plik wynikowy `decisions.csv` jest roboczym eksportem do dalszego mapowania pod finalny format importu WooCommerce.
+
+## Filtrowanie logistyczne Benzara
+
+Drugi lokalny program filtruje sam katalog Benzara przed importem do WooCommerce i nie dotyka API sklepu.
+
+Krotka struktura:
+
+- `src/horpach_benzara/filter_benzara.py` - CLI do uruchomienia programu
+- `src/horpach_benzara/filtering/logistics.py` - logika filtrowania po wadze, wymiarach, liczbie paczek i typie wysylki
+- `output/products_allowed.csv` - produkty dopuszczone
+- `output/products_removed_logistics.csv` - produkty usuniete z powodow logistycznych
+
+Ta wersja programu analizuje tylko pierwszy zestaw logistyczny:
+
+- `Ship Weight 1`
+- `Ship Length 1`
+- `Ship Width 1`
+- `Ship Height 1`
+
+oraz usuwa z pliku dopuszczonych produktow nieuzywane kolumny:
+
+- `Product Weight 2-5`
+- `Product Length 2-5`
+- `Product Width 2-5`
+- `Product Height 2-5`
+- `Ship Weight 2-7`
+- `Ship Length 2-7`
+- `Ship Width 2-7`
+- `Ship Height 2-7`
+
+Zasady twardego usuniecia:
+
+- dowolna paczka ma wage `> 30 lb`
+- dowolna paczka ma dlugosc `> 48 in`
+- dowolna paczka ma szerokosc `> 24 in`
+- dowolna paczka ma wysokosc `> 24 in`
+- suma wymiarow paczki `> 84 in`
+- `Number Of Boxes > 1`
+- `Ship Type Small Package/LTL` zawiera `LTL`, `Freight` lub `Freight Quote`
+- `Inventory Qty < 10`
+
+Uruchomienie:
 
 ```bash
-python -m import_benzara serve --data-root "C:\path\to\data" --host 127.0.0.1 --port 8000
+python -m horpach_benzara.filter_benzara --input "data/inbox/FTP Benzara JUNE (15-06-2026).xlsx" --output-dir output
 ```
 
-Po uruchomieniu:
+Wymagane zaleznosci:
 
-- panel admin: `http://127.0.0.1:8000/`
-- publiczny feed: `http://127.0.0.1:8000/feed.xml`
+```bash
+pip install -r requirements.txt
+```
 
-## Zmienne srodowiskowe
+## Audyt obrazow nowych produktow
 
-- `IMPORT_BENZARA_DATA_DIR` - katalog danych aplikacji
-- `IMPORT_BENZARA_MIN_STOCK_THRESHOLD` - domyslny prog stocku
-- `IMPORT_BENZARA_SECRET_KEY` - sekret Flask
-- `IMPORT_BENZARA_ADMIN_USER` - opcjonalny login Basic Auth
-- `IMPORT_BENZARA_ADMIN_PASSWORD` - opcjonalne haslo Basic Auth
+Program do audytu obrazow bierze jako wejscie:
 
-## Co publikuje aplikacja
+- `output/products_allowed.csv`
+- `data/inbox/horpachcom.WordPress.2026-06-24.xml`
 
-Po kazdym poprawnym przebiegu:
+Dzialanie:
 
-- `data/generated/latest/feed.xml`
-- `data/generated/latest/feed.summary.json`
-- `data/generated/latest/feed.inventory-only.csv`
-- `data/generated/latest/feed.catalog-only.csv`
+- rozdziela produkty na nowe i istniejace po SKU
+- dla nowych waliduje wszystkie pola `Image URL N`
+- najpierw probuje oryginalny URL
+- potem warianty rozszerzen w tym samym katalogu
+- na koncu probuje odzyskac adres ze strony produktu na `benzara.com`
+- dla istniejacych produktow generuje plik update bez kolumn obrazow
 
-## Konfiguracja WooCommerce
+Wyjscia:
 
-W pluginie `Dropshipping XML WooCommerce PRO` ustaw:
+- `output/products_create_with_images.csv`
+- `output/products_update_without_images.csv`
+- `output/products_new_image_audit.csv`
+- `output/products_new_manual_image_review.csv`
 
-- URL pliku: publiczny `feed.xml`
-- identyfikacja produktu: `SKU`
-- wezel produktu: `catalog/products/product`
-- mapowanie pol: `sku`, `stock/qty`, `stock/status`, `stock/manage`
+Uruchomienie:
 
-Synchronizuj tylko pola magazynowe.
-
-## Wdrozenie
-
-Instrukcja wdrozenia znajduje sie tutaj:
-
-- [docs/NAMECHEAP-DEPLOYMENT.md](./docs/NAMECHEAP-DEPLOYMENT.md)
+```bash
+python -m horpach_benzara.image_audit --input output/products_allowed.csv --woo-xml data/inbox/horpachcom.WordPress.2026-06-24.xml --output-dir output --cache-dir output/cache
+```

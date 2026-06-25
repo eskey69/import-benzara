@@ -1,0 +1,6 @@
+data/inbox/*.xlsx filter=lfs diff=lfs merge=lfs -text
+data/output/*.csv filter=lfs diff=lfs merge=lfs -text
+output/*.csv filter=lfs diff=lfs merge=lfs -text
+output/cache/*.json filter=lfs diff=lfs merge=lfs -text
+output/cache_probe/*.json filter=lfs diff=lfs merge=lfs -text
+data/inbox/*.xml filter=lfs diff=lfs merge=lfs -text
